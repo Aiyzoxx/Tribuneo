@@ -1,0 +1,70 @@
+# ====================================================
+# DÉVELOPPEMENT LOCAL uniquement
+# Usage: docker-compose -f docker-compose.dev.yml up
+# ====================================================
+# - Frontend Vite avec HMR (mise à jour instantanée)
+# - Pas de Cloudflare, accès via http://localhost:5173
+# ====================================================
+
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: siteliquidation-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: siteliquidation
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: siteliquidation-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  backend:
+    image: node:20
+    command: sh -c "npm install && npx prisma generate && npm run dev"
+    working_dir: /app
+    container_name: siteliquidation-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/siteliquidation?schema=public
+      - REDIS_URL=redis://redis:6379
+      - PORT=3000
+      - SYNC_TOKEN=my-super-secret-token
+      - OPENAI_API_KEY=sk-qVVlxscHSr5fNxcWyAdgWvteLPOEV18a5uKimfw68Xxyk7UB
+      - OPENAI_BASE_URL=https://api.bluesminds.com/v1
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - db
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: siteliquidation-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=/api
+    volumes:
+      - ./frontend:/app        # Monte le code source pour le HMR
+      - /app/node_modules      # Garde les node_modules du conteneur
+    depends_on:
+      - backend
+
+volumes:
+  db-data:
+  redis-data:

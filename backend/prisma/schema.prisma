@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Procedure {
+  id              Int       @id @default(autoincrement())
+  numen           String    @unique @db.VarChar(50)
+  siren           String?   @db.VarChar(9)
+  raison_sociale  String?   @db.VarChar(255)
+  forme_juridique String?   @db.VarChar(100)
+  adresse         String?   @db.Text
+  ville           String?   @db.VarChar(100)
+  code_postal     String?   @db.VarChar(5)
+  departement     String?   @db.VarChar(3)
+  type_procedure  String?   @db.VarChar(50)
+  date_jugement   DateTime? @db.Date
+  tribunal        String?   @db.VarChar(150)
+  liquidateur     String?   @db.VarChar(255)
+  lien_bodacc     String?   @db.Text
+  analyse_ia      String?   @db.Text
+  coordonnees     Unsupported("geography(Point, 4326)")?
+  precision_geo   String?   @db.VarChar(20)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now()) @updatedAt
+
+  suivis   Suivi[]
+  contacts Contact[]
+
+  @@index([siren], name: "idx_procedures_siren")
+  @@index([type_procedure], name: "idx_procedures_type")
+  @@index([coordonnees], name: "idx_procedures_geo", type: Gist)
+
+  @@map("procedures")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  email      String   @unique @db.VarChar(255)
+  password   String?  @db.VarChar(255)   // Optionnel (compte admin local)
+  nom        String?  @db.VarChar(100)
+  photo      String?  @db.Text            // URL photo Google
+  google_id  String?  @unique @db.VarChar(100)  // ID Google OAuth
+  role       String   @default("user") @db.VarChar(20)
+  created_at DateTime @default(now())
+
+  suivis            Suivi[]
+  contacts          Contact[]
+  alertes           Alerte[]
+  directoryContacts DirectoryContact[]
+
+  @@map("users")
+}
+
+model Suivi {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  procedureId Int
+  created_at  DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  procedure Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, procedureId])
+  @@map("suivis")
+}
+
+model Contact {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  procedureId   Int
+  interlocuteur String?  @db.VarChar(200)
+  note          String?  @db.Text
+  date_contact  DateTime @default(now())
+  created_at    DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  procedure Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+
+  @@map("contacts")
+}
+
+model Alerte {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  ville      String   @db.VarChar(100)
+  rayon_km   Int      @default(30)
+  lat        Float
+  lng        Float
+  active     Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("alertes")
+}
+
+model DirectoryContact {
+  id               Int      @id @default(autoincrement())
+  prenom           String?  @db.VarChar(100)
+  nom              String?  @db.VarChar(100)
+  titre_poste      String?  @db.VarChar(150)
+  entreprise       String?  @db.VarChar(150)
+  email            String?  @db.VarChar(150)
+  telephone_fixe   String?  @db.VarChar(50)
+  telephone_mobile String?  @db.VarChar(50)
+  site_web         String?  @db.VarChar(255)
+  adresse_postale  String?  @db.Text
+  ville            String?  @db.VarChar(100)
+  code_postal      String?  @db.VarChar(20)
+  pays             String?  @db.VarChar(100)
+  linkedin         String?  @db.VarChar(255)
+  userId           Int?
+  user             User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now()) @updatedAt
+
+  @@map("directory_contacts")
+}
